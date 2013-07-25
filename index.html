@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Drop & Sketch</title>
+	<link rel="stylesheet" type="text/css" href="normalize.css">
+	<link rel="stylesheet" type="text/css" href="JS/jquery/themes/base/jquery-ui.css">
+	<script type="text/javascript" src="JS/jquery/jquery-1.9.1.js"></script>
+	<script type="text/javascript" src="JS/jquery/ui/jquery-ui.js"></script>
+	<script type="text/javascript" src="JS/jcanvas.min.js"></script>
+	<script type="text/javascript" src="JS/jquery.simple-color.js"></script>
+	<script type="text/javascript">
+	var sketch, canvas, ctx;
+	var drawFlag = false;
+	var hex = '000000';
+	$(function() {
+		console.log('start');
+		canvas = $('#sketch').get(0);
+		ctx = canvas.getContext('2d');
+		clearImg();
+
+		$('#color_picker').simpleColor({
+			defaultColor: '#' + hex,
+			boxWidth: 50,
+			boxHeight: 50,
+			livePreview: true,
+			onSelect: function(c){
+				hex = c;
+			}
+		});
+		$("#slider").slider({			
+			value: 3,
+			min: 1,
+			max: 20,
+			step: 1,
+		});
+		$('#sketch').mousemove(function(e){
+			var x = e.offsetX;
+			var y = e.offsetY;
+			var r = $('#slider').slider('value');
+			if(drawFlag) {
+				$("#sketch").drawLine({
+					strokeStyle: '#' + hex,
+					strokeWidth: r,
+					rounded: true,
+					x1: sx, y1: sy,
+					x2: x, y2: y,
+				});
+				sx = x;
+				sy = y;
+			}
+
+		});
+		$('#sketch').mousedown(function(e){
+			drawFlag = true;
+			sx = e.offsetX;
+			sy = e.offsetY;
+		});
+		$('#sketch').mouseup(function(e){
+			drawFlag = false;
+		});
+
+
+		$.ajax({
+			url: 'read.rb',
+			dataType: 'text'
+		}).done(function(data){
+			if(data == '') return;
+			var filename_array = data.split(",");
+			for( var i = 0; i < filename_array.length; i++){
+				prependImg(filename_array[i]);
+			}
+		});
+
+		$('#sketch').droppable({
+			accept: '.thumbnail',
+			drop: function(e, ui) {
+				var img = new Image();
+				img.src = ui.draggable.attr('src');
+				ctx.drawImage(img, 0, 0);
+			}
+		});
+	});
+
+	function saveImg() {
+		var imgdata = canvas.toDataURL();
+		imgdata = imgdata.replace('data:image/png;base64,', '');
+		var filename = datetostr();
+		console.log(imgdata);
+		console.log(filename);
+		$.ajax({
+			type: 'POST',
+			url: 'save.rb', 
+			data: 'img=' + encodeURIComponent(imgdata)
+					+ '&filename=' + filename
+			}).done(function(data){
+				prependImg(data).hide().fadeIn(1000);
+				if($('#image_area img').length > 10) {
+					$('#image_area img:last').remove();
+				}
+		});
+		clearImg();
+	}
+	function clearImg() {
+		$('#sketch').drawRect({
+			fillStyle: "#fff",
+			x: 0, y: 0,
+			width: 500,
+			height: 300,
+			fromCenter: false
+		});
+	}
+	function datetostr() {
+		var str;
+		var date = new Date();
+		datearray = [date.getFullYear(),
+					 date.getMonth()+1,
+					 date.getDate(),
+					 date.getHours(),
+					 date.getMinutes(),
+					 date.getSeconds() ];
+		for(var i = 1; i < datearray.length; i++) {
+			if((''+datearray[i]).length < 2) {
+				datearray[i] = '0' + datearray[i];
+			}
+		}
+		return datearray.join('');
+	}
+	function imageToHtml(filename) {
+		return '<img src="' + filename + '" class="thumbnail" />';
+	}
+	function prependImg(image) {
+		image = $(imageToHtml(image));
+		return 	image.insertAfter('#image_area h1')
+						.draggable({
+							snap: '#sketch',
+							revert: true
+						});
+	}
+	</script>
+	<style type="text/css">
+	body {
+		background-color: #e74c3c;
+	}
+	canvas {
+		border: 1px solid rgb(0, 0, 0);
+	}
+	header {
+		height: 50px;
+		width: 100%;
+		padding-left: 20px;
+		background-color: #34495e;
+		position: fixed;
+		z-index: 10;
+	}
+	h1 {
+		margin: 0 0 30px 0;
+		color: #fff;
+		font-size: 32px;
+	}
+
+	#sketch_area {
+		background-color: #fff;
+		position: fixed;
+		width: 500px;
+		height: 100%;
+		margin: 50px 0 0 0;
+		padding: 20px 25px 0 25px;
+	}
+	#tools {
+		float: left;
+		height: 50px;
+	}
+	#picker {
+		float: left;
+		margin: 0 10px;
+		z-index: 10;
+	}
+	.simpleColorChooser{
+		z-index: 10;
+	}
+	#slider {
+		margin: 20px 20px 20px 70px;
+		width: 150px;
+		height: 10px;
+	}
+	#buttons{
+		float: right;
+		height: 50px;
+		line-height: 50px;
+		margin-right: 10px;
+	}
+	#image_area {
+		margin-left: 550px;
+		padding-left: 50px;
+		padding-top: 70px;
+	}
+	#image_area h1{
+		margin: 0 0 10px 0;
+		color: #fff;
+		font-size: 32px;
+	}
+	.thumbnail {
+		display: block;
+		float: left;
+		width: 200px;
+		border: 1px solid rgb(0, 0, 0);
+		margin: 3px;
+	}
+	</style>
+</head>
+<body>
+<header><h1>Drop & Sketch</h1></header>
+<div id="sketch_area">
+<canvas id="sketch" width=500 height=300></canvas>
+<div id="tools">
+	<div id="picker"><input id='color_picker' value="#000000"/></div>
+	<div id="slider"></div>
+</div>
+<div id="buttons">
+<input type="button" onclick="clearImg()" value="Clear" id="clear_image" />
+<input type="button" onclick="saveImg()" value="Save" id="save_image" />
+</div>
+</div>
+<div id="image_area">
+	<h1>Drop to Canvas</h1>
+</div>
+</body>
+</html>
